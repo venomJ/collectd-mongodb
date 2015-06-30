@@ -3,7 +3,9 @@
 #
 
 import collectd
-from pymongo import Connection
+import pymongo
+#from pymongo import Connection
+from pymongo import MongoClient
 from distutils.version import StrictVersion as V
 
 
@@ -36,8 +38,10 @@ class MongoDB(object):
         v.dispatch()
 
     def do_server_status(self):
-        con = Connection(host=self.mongo_host, port=self.mongo_port, slave_okay=True)
-        db = con[self.mongo_db[0]]
+        #con = Connection(host=self.mongo_host, port=self.mongo_port, slave_okay=True)
+	client = MongoClient(self.mongo_host, self.mongo_port)
+        db = client.test_database
+	#db = con[self.mongo_db[0]]
         if self.mongo_user and self.mongo_password:
             db.authenticate(self.mongo_user, self.mongo_password)
         server_status = db.command('serverStatus')
@@ -57,39 +61,41 @@ class MongoDB(object):
         self.submit('connections', 'connections', server_status['connections']['current'])
 
         # locks
-        if self.lockTotalTime is not None and self.lockTime is not None:
-            if self.lockTime == server_status['globalLock']['lockTime']:
-                value = 0.0
-            else:
-                value = float(server_status['globalLock']['lockTime'] - self.lockTime) * 100.0 / float(server_status['globalLock']['totalTime'] - self.lockTotalTime)
-            self.submit('percent', 'lock_ratio', value)
+#        if self.lockTotalTime is not None and self.lockTime is not None:
+#            if self.lockTime == server_status['globalLock']['lockTime']:
+#                value = 0.0
+#            else:
+#                value = float(server_status['globalLock']['lockTime'] - self.lockTime) * 100.0 / float(server_status['globalLock']['totalTime'] - self.lockTotalTime)
+#            self.submit('percent', 'lock_ratio', value)
 
-        self.lockTotalTime = server_status['globalLock']['totalTime']
-        self.lockTime = server_status['globalLock']['lockTime']
+#        self.lockTotalTime = server_status['globalLock']['totalTime']
+#        self.lockTime = server_status['globalLock']['lockTime']
 
         # indexes
-        accesses = None
-        misses = None
-        index_counters = server_status['indexCounters'] if at_least_2_4 else server_status['indexCounters']['btree']
+#        accesses = None
+#        misses = None
+#        index_counters = server_status['indexCounters'] if at_least_2_4 else server_status['indexCounters']['btree']
 
-        if self.accesses is not None:
-            accesses = index_counters['accesses'] - self.accesses
-            if accesses < 0:
-                accesses = None
-        misses = (index_counters['misses'] or 0) - (self.misses or 0)
-        if misses < 0:
-            misses = None
-        if accesses and misses is not None:
-            self.submit('cache_ratio', 'cache_misses', int(misses * 100 / float(accesses)))
-        else:
-            self.submit('cache_ratio', 'cache_misses', 0)
-        self.accesses = index_counters['accesses']
-        self.misses = index_counters['misses']
+#        if self.accesses is not None:
+#            accesses = index_counters['accesses'] - self.accesses
+#            if accesses < 0:
+#                accesses = None
+#        misses = (index_counters['misses'] or 0) - (self.misses or 0)
+#        if misses < 0:
+#            misses = None
+#        if accesses and misses is not None:
+#            self.submit('cache_ratio', 'cache_misses', int(misses * 100 / float(accesses)))
+#        else:
+#            self.submit('cache_ratio', 'cache_misses', 0)
+#        self.accesses = index_counters['accesses']
+#        self.misses = index_counters['misses']
 
         for mongo_db in self.mongo_db:
-            db = con[mongo_db]
+            #db = con[mongo_db]
+	    #db = client[mongo_db]
             if self.mongo_user and self.mongo_password:
-                con[self.mongo_db[0]].authenticate(self.mongo_user, self.mongo_password)
+                #con[self.mongo_db[0]].authenticate(self.mongo_user, self.mongo_password)
+		client[self.mongo_db[0]].authenticate(self.mongo_user, self.mongo_password)
             db_stats = db.command('dbstats')
 
             # stats counts
@@ -103,7 +109,7 @@ class MongoDB(object):
             self.submit('file_size', 'index', db_stats['indexSize'], mongo_db)
             self.submit('file_size', 'data', db_stats['dataSize'], mongo_db)
 
-        con.disconnect()
+        #con.disconnect()
 
     def config(self, obj):
         for node in obj.children:
